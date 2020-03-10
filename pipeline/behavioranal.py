@@ -2,6 +2,7 @@
 import datajoint as dj
 import pandas as pd
 import numpy as np
+import scipy
 from scipy.stats import norm
 from scipy.optimize import curve_fit
 #import decimal
@@ -28,7 +29,7 @@ block_reward_ratio_increment_window = 20
 block_reward_ratio_increment_max = 200
 #%%
 def calculate_average_likelihood(local_income,choice,parameters):
-    #%%
+    #%
 # =============================================================================
 #         local_income = np.asarray(df_choices['local_fractional_income'][0].tolist())
 #         choice = np.asarray(df_choices['choice_local_fractional_income'][0].tolist())
@@ -104,7 +105,7 @@ def calculate_average_likelihood_series(local_income,choice,parameters,local_fil
 # =============================================================================
 
 def calculate_local_income_three_ports(df_behaviortrial,filter_now):
-
+#%
     trialnum_differential = df_behaviortrial['trial']
     trialnum_fractional = df_behaviortrial['trial']
     right_choice = (df_behaviortrial['trial_choice'] == 'right').values
@@ -152,21 +153,35 @@ def calculate_local_income_three_ports(df_behaviortrial,filter_now):
     local_fractional_income_middle = local_fractional_income_middle[~todel]
     choice_local_fractional_income = choice_local_fractional_income[~todel]
     trialnum_fractional = trialnum_differential[~todel]
+    #%
     dataout = dict()
     dataout['local_fractional_income_right'] = local_fractional_income_right
     dataout['local_fractional_income_left'] = local_fractional_income_left
     dataout['local_fractional_income_middle'] = local_fractional_income_middle
     dataout['choice_local_fractional_income'] = choice_local_fractional_income
-    dataout['trialnum_fractional'] = trialnum_fractional
+    dataout['trialnum_fractional'] = trialnum_fractional.values
     dataout['local_differential_income_right'] = local_differential_income_right
     dataout['local_differential_income_left'] = local_differential_income_left
     dataout['local_differential_income_middle'] = local_differential_income_middle
     dataout['choice_local_differential_income'] = choice_local_differential_income
-    dataout['trialnum_differential'] = trialnum_differential
+    dataout['trialnum_differential'] = trialnum_differential.values
+    #%
     return dataout
 
-def bin_psychometric_curve(local_income,choice_num,local_income_binnum):
+def bin_psychometric_curve(local_income,choice_num,local_income_binnum,circular = False):
     #%
+# =============================================================================
+#     local_income = reward_ratio_arc
+#     choice_num = choice_arc
+#     if circular:
+#         #%
+#         bottoms = np.arange(np.pi*-1,np.pi, 2*np.pi/local_income_binnum)
+#         tops = np.arange(2*np.pi/local_income_binnum-np.pi,np.pi+2*np.pi/local_income_binnum/10, 2*np.pi/local_income_binnum)
+#         tops[tops > np.pi] = np.pi
+#         bottoms[bottoms < np.pi*-1] = np.pi*-1
+#     else:
+#         #%%
+# =============================================================================
     bottoms = np.arange(0,100, 100/local_income_binnum)
     tops = np.arange(100/local_income_binnum,100.005, 100/local_income_binnum)
     tops[tops > 100] = 100
@@ -183,22 +198,31 @@ def bin_psychometric_curve(local_income,choice_num,local_income_binnum):
             idx = (local_income== minval)
         else:
             idx = (local_income>= minval) & (local_income < maxval)
-        reward_ratio_mean.append(np.mean(local_income[idx]))
-        reward_ratio_sd.append(np.std(local_income[idx]))
+        if circular:
+            reward_ratio_mean.append(scipy.stats.circmean(local_income[idx],high = np.pi, low = np.pi*-1))
+            reward_ratio_sd.append(scipy.stats.circstd(local_income[idx],high = np.pi, low = np.pi*-1))
+        else:
+            reward_ratio_mean.append(np.mean(local_income[idx]))
+            reward_ratio_sd.append(np.std(local_income[idx]))
 # =============================================================================
 #         choice_ratio_mean.append(np.mean(choice_num[idx]))
 #         choice_ratio_sd.append(np.std(choice_num[idx]))
 # =============================================================================
-        bootstrap = bs.bootstrap(choice_num[idx], stat_func=bs_stats.mean)
-        choice_ratio_mean.append(bootstrap.value)
-        choice_ratio_sd.append(bootstrap.error_width())
-        n.append(np.sum(idx))
+        if circular:
+            choice_ratio_mean.append(scipy.stats.circmean(choice_num[idx],high = np.pi, low = np.pi*-1))
+            choice_ratio_sd.append(scipy.stats.circstd(choice_num[idx],high = np.pi, low = np.pi*-1))
+            n.append(np.sum(idx))
+        else:
+            bootstrap = bs.bootstrap(choice_num[idx], stat_func=bs_stats.mean)
+            choice_ratio_mean.append(bootstrap.value)
+            choice_ratio_sd.append(bootstrap.error_width())
+            n.append(np.sum(idx))
         #%
     return reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n
 
 
 def logistic_regression_on_trial_history(key, fittype):
-#%%
+#%
     trials_back = logistic_regression_trials_back 
     first_session = logistic_regression_first_session
     max_bias = logistic_regression_max_bias
@@ -218,7 +242,7 @@ def logistic_regression_on_trial_history(key, fittype):
                 else:
                     df_behaviortrial_all = df_behaviortrial_all.append(df_behaviortrial_now)
             #print(key)
-            #%%
+            #%
             if len(df_behaviortrial_all)>0:
                 sessions = np.unique(df_behaviortrial_all['session'])
                 for session in sessions:
@@ -296,13 +320,13 @@ def logistic_regression_on_trial_history(key, fittype):
                         coeff_choices = coefficients[::-1]
                         key['coefficients_choices_subject'] = coeff_choices
                     key['score_subject'] = score
-                    #%%
+                    #%
                     return key
                     print(wrnumber + ' coefficients fitted for ' + fittype)
                 else:
                     return None
                     print('not enough data for' + wrnumber +' in '+ fittype)
-
+#%%
 def logistic_regression_on_trial_history_3lp(key, fittype):
 #%%
     trials_back = logistic_regression_trials_back 
@@ -407,7 +431,7 @@ def logistic_regression_on_trial_history_3lp(key, fittype):
                         print('not enough data for' + wrnumber +' in '+ fittype)                    
                         return None
                         
-                        #%%
+                        #%
                 print(wrnumber + ' coefficients fitted for ' + fittype)
                 return key
             else:
@@ -415,9 +439,9 @@ def logistic_regression_on_trial_history_3lp(key, fittype):
                 return None
                 
 
-#%%
+#%
 def logistic_regression_on_trial_history_convolved(key, fittype):
-    #%%
+    #%
     filter_time_constants = np.arange(1,25,2)
     trials_back = logistic_regression_trials_back 
     first_session = logistic_regression_first_session
@@ -523,7 +547,7 @@ def logistic_regression_on_trial_history_convolved(key, fittype):
                         key['coefficients_choices_subject'] = coeff_choices
                     key['score_subject'] = score
                     key['filter_time_constants'] = filter_time_constants
-                    #%%
+                    #%
                     return key
                     print(wrnumber + ' coefficients fitted for ' + fittype)
                 else:
@@ -603,6 +627,7 @@ class SessionStats(dj.Computed):
     session_hits : int #number of hits
     session_misses : int #number of misses
     session_ignores : int #number of ignores
+    session_ignore_trial_nums : longblob #number of ignores
     session_autowaters : int #number of autowaters
     session_length : decimal(10, 4) #length of the session in seconds
     session_pretraining_trial_num = null: int #number of pretraining trials
@@ -628,17 +653,17 @@ class SessionStats(dj.Computed):
             realtraining = (df_choices['p_reward_left']<1) & (df_choices['p_reward_right']<1) & ((df_choices['p_reward_middle']<1) | df_choices['p_reward_middle'].isnull())
             if not realtraining.values.any():
                 keytoadd['session_pretraining_trial_num'] = keytoadd['session_trialnum']
-                print('all pretraining')
+               # print('all pretraining')
             else:
                 keytoadd['session_pretraining_trial_num'] = realtraining.values.argmax()
-                print(str(realtraining.values.argmax())+' out of '+str(keytoadd['session_trialnum']))
+                #print(str(realtraining.values.argmax())+' out of '+str(keytoadd['session_trialnum']))
             if (df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values.any():
                 keytoadd['session_1st_ignore'] = (df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values.argmax()+keytoadd['session_pretraining_trial_num']+1
-                if (np.convolve([1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==3).any:
-                    keytoadd['session_1st_2_ignores'] = (np.convolve([1,1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==2).argmax()
-                if (np.convolve([1,1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==3).any:
-                    keytoadd['session_1st_3_ignores'] = (np.convolve([1,1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==3).argmax()
-       
+                if (np.convolve([1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==2).any():
+                    keytoadd['session_1st_2_ignores'] = (np.convolve([1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==2).argmax() +keytoadd['session_pretraining_trial_num']+1
+                if (np.convolve([1,1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==3).any():
+                    keytoadd['session_1st_3_ignores'] = (np.convolve([1,1,1],(df_choices['outcome'][keytoadd['session_pretraining_trial_num']:] == 'ignore').values)==3).argmax() +keytoadd['session_pretraining_trial_num']+1
+       #%%
         self.insert1(keytoadd,skip_duplicates=True)
         
 @schema
@@ -794,12 +819,22 @@ class SessionTrainingType(dj.Computed):
     -> experiment.Session
     ---
     session_task_protocol : tinyint # the number of the dominant task protocol in the session
+    session_real_foraging : bool # True if it is real foraging, false in case of pretraining
     """
     def make(self, key):
-        df_taskdetails = pd.DataFrame(experiment.BehaviorTrial() & key)
-        if len(df_taskdetails)>0:  # in some sessions there is no behavior at all..
-            key['session_task_protocol'] = df_taskdetails['task_protocol'].median()
+        task_protocol,p_reward_left,p_reward_right,p_reward_middle = (experiment.BehaviorTrial() *experiment.SessionBlock() & key).fetch('task_protocol','p_reward_left','p_reward_right','p_reward_middle')
+        if len(task_protocol)>0:  # in some sessions there is no behavior at all..
+            key['session_task_protocol'] = np.median(task_protocol)
+            p_reward_left = np.asarray(p_reward_left,'float')
+            p_reward_right = np.asarray(p_reward_right,'float')
+            p_reward_middle = np.asarray(p_reward_middle,'float')
+            if any((p_reward_left<1) & (p_reward_left>0)) or any((p_reward_right<1) & (p_reward_right>0)) or any((p_reward_middle<1) & (p_reward_middle>0)):
+                key['session_real_foraging'] =  True
+            else:
+                key['session_real_foraging'] =  False
             self.insert1(key,skip_duplicates=True)
+
+
        
 @schema
 class SessionBias(dj.Computed):
@@ -1112,37 +1147,45 @@ class BlockAutoWaterCount(dj.Computed):
         self.insert1(key,skip_duplicates=True)
 
 @schema
-class SessionBlockSwitchChoices(dj.Computed):
+class SessionBlockSwitchChoices(dj.Computed): # TODO update to 3  lickports
     definition = """
     -> experiment.Session
     ---
     block_length_prev : longblob
     block_length_next : longblob
-    choices_matrix : longblob #
+    choices_matrix : longblob # 0 = left, 1=right, 2=middle
     p_r_prev : longblob #
     p_l_prev : longblob #
     p_l_next : longblob # 
     p_r_next : longblob #
+    p_m_prev : longblob #
+    p_m_next : longblob # 
     p_l_change : longblob # 
     p_r_change : longblob #
+    p_m_change : longblob #
     
     """    
     def make(self, key):
-        minblocklength = 20
+        minblocklength = 30
         prevblocklength = 30
-        nextblocklength = 50
+        nextblocklength = 100
         df_behaviortrial = pd.DataFrame((experiment.BehaviorTrial() & key) * (experiment.SessionBlock() & key) * (BlockRewardRatio()&key))
+        df_behaviortrial.fillna(value=pd.np.nan, inplace=True)
         if len(df_behaviortrial)>0:
             df_behaviortrial['trial_choice_plot'] = np.nan
-            df_behaviortrial.loc[df_behaviortrial['trial_choice']=='left','trial_choice_plot']=0
-            df_behaviortrial.loc[df_behaviortrial['trial_choice']=='right','trial_choice_plot']=1
+            df_behaviortrial.loc[df_behaviortrial['trial_choice']=='left','trial_choice_plot'] = 0
+            df_behaviortrial.loc[df_behaviortrial['trial_choice']=='right','trial_choice_plot'] = 1
+            df_behaviortrial.loc[df_behaviortrial['trial_choice']=='middle','trial_choice_plot'] = 2
             blockchanges=np.where(np.diff(df_behaviortrial['block']))[0]
             p_change_L = list()
             p_change_R = list()
+            p_change_M = list()
             p_L_prev = list()
             p_R_prev = list()
+            p_M_prev = list()
             p_L_next = list()
             p_R_next = list()
+            p_M_next = list()
             choices_matrix = list()
             block_length_prev = list()
             block_length_next = list()
@@ -1153,15 +1196,20 @@ class SessionBlockSwitchChoices(dj.Computed):
                 next_block_p_L = df_behaviortrial['p_reward_left'][idx+1]
                 prev_block_p_R = df_behaviortrial['p_reward_right'][idx]
                 next_block_p_R = df_behaviortrial['p_reward_right'][idx+1]
+                prev_block_p_M = df_behaviortrial['p_reward_middle'][idx]
+                next_block_p_M = df_behaviortrial['p_reward_middle'][idx+1]
                 if prev_blocknum > minblocklength and next_blocknum > minblocklength:
                     block_length_prev.append(prev_blocknum)
                     block_length_next.append(next_blocknum)
                     p_L_prev.append(float(prev_block_p_L))
                     p_R_prev.append(float(prev_block_p_R))
+                    p_M_prev.append(float(prev_block_p_M))
                     p_L_next.append(float(next_block_p_L))
                     p_R_next.append(float(next_block_p_R))
+                    p_M_next.append(float(next_block_p_M))
                     p_change_L.append(float((next_block_p_L-prev_block_p_L)))
                     p_change_R.append(float(next_block_p_R-prev_block_p_R))
+                    p_change_M.append(float(next_block_p_M-prev_block_p_M))
                     choices = np.array(df_behaviortrial['trial_choice_plot'][max([np.max([idx-prevblocklength+1,idx-prev_blocknum+1]),0]):idx+np.min([nextblocklength+1,next_blocknum+1])],dtype=np.float32)
                     if next_blocknum < nextblocklength:
                         ending = np.ones(nextblocklength-next_blocknum)*np.nan
@@ -1175,10 +1223,13 @@ class SessionBlockSwitchChoices(dj.Computed):
             key['block_length_next'] = block_length_next
             key['p_l_prev'] = p_L_prev
             key['p_r_prev'] = p_R_prev
+            key['p_m_prev'] = p_M_prev
             key['p_l_next'] = p_L_next
             key['p_r_next'] = p_R_next
+            key['p_m_next'] = p_M_next
             key['p_l_change'] = p_change_L
             key['p_r_change'] = p_change_R
+            key['p_m_change'] = p_change_M
             key['choices_matrix'] = choices_matrix
             self.insert1(key,skip_duplicates=True)
     
@@ -1657,12 +1708,15 @@ class SessionPsychometricDataBoxCar(dj.Computed):
     local_filter : longblob
     """  
     def make(self,key):
+        #%%
+        #key = {'subject_id': 452274, 'session': 5}
         warnings.filterwarnings("ignore", category=RuntimeWarning)        
         local_filter = np.ones(10)
         local_filter = local_filter/sum(local_filter)
         df_behaviortrial = pd.DataFrame(experiment.BehaviorTrial()&key)
         if len(df_behaviortrial)>1:
             #local_fractional_income, choice_local_fractional_income, trialnum_fractional, local_differential_income, choice_local_differential_income, trialnum_differential  = calculate_local_income(df_behaviortrial,local_filter)
+            #print(key)
             data = calculate_local_income_three_ports(df_behaviortrial,local_filter)
             key['local_fractional_income_right'] = data['local_fractional_income_right']
             key['local_fractional_income_left'] = data['local_fractional_income_left']
@@ -1675,6 +1729,7 @@ class SessionPsychometricDataBoxCar(dj.Computed):
             key['choice_local_differential_income']= data['choice_local_differential_income']
             key['trialnum_local_differential_income'] = data['trialnum_differential']
             key['local_filter'] = local_filter
+            #%%
             self.insert1(key,skip_duplicates=True)
 
 @schema
@@ -1716,6 +1771,9 @@ class SessionPsychometricDataFitted(dj.Computed):
                 key['trialnum_local_differential_income'] = data['trialnum_differential']
                 key['local_filter'] = local_filter
                 self.insert1(key,skip_duplicates=True)
+                
+                
+                
 
 @schema    
 class SubjectPsychometricCurveBoxCarFractional(dj.Computed):
@@ -1736,11 +1794,15 @@ class SubjectPsychometricCurveBoxCarFractional(dj.Computed):
     local_filter : longblob
     """     
     def make(self,key):  
+        #%
+# =============================================================================
+#         key = {'subject_id': 457495}
+# =============================================================================
         minsession = 8
         reward_ratio_binnum = 10
         df_psychcurve = pd.DataFrame(SessionPsychometricDataBoxCar()&key & 'session > '+str(minsession-1))
         if len(df_psychcurve )>0:
-            
+            print(key)
             reward_ratio_combined = np.concatenate(df_psychcurve['local_fractional_income_right'].values)
             choice_num = np.concatenate(df_psychcurve['choice_local_fractional_income'].values)
             mu,sigma = curve_fit(norm.cdf, reward_ratio_combined, choice_num,p0=[0,1])[0]
@@ -1763,7 +1825,134 @@ class SubjectPsychometricCurveBoxCarFractional(dj.Computed):
             key['linear_fit_slope'] = slope
             key['linear_fit_c'] = c
             key['trial_num'] = n
-            key['local_filter'] = df_psychcurve['local_filter']
+            key['local_filter'] = df_psychcurve['local_filter'][0]
+            #%
+            print(key)
+            self.insert1(key,skip_duplicates=True)
+
+
+@schema    
+class SubjectPolarPsyCurveBoxCarFractional2lp(dj.Computed):
+    definition = """
+    -> lab.Subject
+    ---
+    reward_ratio_mean  : longblob
+    reward_ratio_sd  : longblob
+    choice_ratio_mean  : longblob
+    choice_ratio_sd  : longblob
+    trial_num : longblob
+    local_filter : longblob
+    """     
+# =============================================================================
+#     sigmoid_fit_mu : double
+#     sigmoid_fit_sigma : double 
+#     sigmoid_fit_exp_temperature : double
+#     sigmoid_fit_exp_bias : double 
+#     linear_fit_slope : double
+#     linear_fit_c : double
+# =============================================================================    
+    def make(self,key):  
+        #%
+        #key = {'subject_id': 452273}
+        minsession = 8
+        reward_ratio_binnum = 10
+        df_psychcurve = pd.DataFrame(SessionPsychometricDataBoxCar()*SessionTrainingType()&key & 'session > '+str(minsession-1)&'session_task_protocol = 100')
+        if len(df_psychcurve )>0:
+            print(key)
+            #%
+            vector_middle = [1,0]
+            vector_right = [-1*np.cos(np.pi/3),np.sin(np.pi/3)]
+            vector_left = [-1*np.cos(np.pi/3),-1*np.sin(np.pi/3)]
+            reward_ratio_combined_right = np.concatenate(df_psychcurve['local_fractional_income_right'].values)
+            reward_ratio_combined_left = np.concatenate(df_psychcurve['local_fractional_income_left'].values)
+            reward_ratio_combined_middle = np.concatenate(df_psychcurve['local_fractional_income_middle'].values)
+            reward_ratio_x_coords = reward_ratio_combined_right*vector_right[0] + reward_ratio_combined_middle*vector_middle[0] +reward_ratio_combined_left*vector_left[0]
+            reward_ratio_y_coords = reward_ratio_combined_right*vector_right[1] + reward_ratio_combined_middle*vector_middle[1] +reward_ratio_combined_left*vector_left[1]
+            reward_ratio_arc = np.arctan2(reward_ratio_y_coords,reward_ratio_x_coords)
+            arc_left_right_middle = np.asarray(np.arctan2([vector_left[1],vector_right[1],vector_middle[1]],[vector_left[0],vector_right[0],vector_middle[0]]))
+            choice_num = np.asarray(np.concatenate(df_psychcurve['choice_local_fractional_income'].values),int)
+            choice_arc = arc_left_right_middle[choice_num]
+
+            
+            reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n = bin_psychometric_curve(reward_ratio_arc,choice_arc,reward_ratio_binnum,circular = True)
+            #%
+            key['reward_ratio_mean'] = reward_ratio_mean
+            key['reward_ratio_sd'] = reward_ratio_sd
+            key['choice_ratio_mean'] = choice_ratio_mean
+            key['choice_ratio_sd'] = choice_ratio_sd
+# =============================================================================
+#             key['sigmoid_fit_mu'] = None
+#             key['sigmoid_fit_sigma'] = None
+#             key['sigmoid_fit_exp_temperature'] = None
+#             key['sigmoid_fit_exp_bias'] = None
+#             key['linear_fit_slope'] = None
+#             key['linear_fit_c'] = None
+# =============================================================================
+            key['trial_num'] = n
+            key['local_filter'] = df_psychcurve['local_filter'][0]
+            #%
+            self.insert1(key,skip_duplicates=True)
+
+@schema    
+class SubjectPolarPsyCurveBoxCarFractional3lp(dj.Computed):
+    definition = """
+    -> lab.Subject
+    ---
+    reward_ratio_mean  : longblob
+    reward_ratio_sd  : longblob
+    choice_ratio_mean  : longblob
+    choice_ratio_sd  : longblob
+    trial_num : longblob
+    local_filter : longblob
+    """     
+# =============================================================================
+#     sigmoid_fit_mu : double
+#     sigmoid_fit_sigma : double 
+#     sigmoid_fit_exp_temperature : double
+#     sigmoid_fit_exp_bias : double 
+#     linear_fit_slope : double
+#     linear_fit_c : double
+# =============================================================================    
+    def make(self,key):  
+        #%
+        #key = {'subject_id': 452273}
+        minsession = 8
+        reward_ratio_binnum = 10
+        df_psychcurve = pd.DataFrame(SessionPsychometricDataBoxCar()*SessionTrainingType()&key & 'session > '+str(minsession-1)&'session_task_protocol = 101')
+        if len(df_psychcurve )>0:
+            print(key)
+            #%
+            vector_middle = [1,0]
+            vector_right = [-1*np.cos(np.pi/3),np.sin(np.pi/3)]
+            vector_left = [-1*np.cos(np.pi/3),-1*np.sin(np.pi/3)]
+            reward_ratio_combined_right = np.concatenate(df_psychcurve['local_fractional_income_right'].values)
+            reward_ratio_combined_left = np.concatenate(df_psychcurve['local_fractional_income_left'].values)
+            reward_ratio_combined_middle = np.concatenate(df_psychcurve['local_fractional_income_middle'].values)
+            reward_ratio_x_coords = reward_ratio_combined_right*vector_right[0] + reward_ratio_combined_middle*vector_middle[0] +reward_ratio_combined_left*vector_left[0]
+            reward_ratio_y_coords = reward_ratio_combined_right*vector_right[1] + reward_ratio_combined_middle*vector_middle[1] +reward_ratio_combined_left*vector_left[1]
+            reward_ratio_arc = np.arctan2(reward_ratio_y_coords,reward_ratio_x_coords)
+            arc_left_right_middle = np.asarray(np.arctan2([vector_left[1],vector_right[1],vector_middle[1]],[vector_left[0],vector_right[0],vector_middle[0]]))
+            choice_num = np.asarray(np.concatenate(df_psychcurve['choice_local_fractional_income'].values),int)
+            choice_arc = arc_left_right_middle[choice_num]
+
+            
+            reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n = bin_psychometric_curve(reward_ratio_arc,choice_arc,reward_ratio_binnum,circular = True)
+            #%
+            key['reward_ratio_mean'] = reward_ratio_mean
+            key['reward_ratio_sd'] = reward_ratio_sd
+            key['choice_ratio_mean'] = choice_ratio_mean
+            key['choice_ratio_sd'] = choice_ratio_sd
+# =============================================================================
+#             key['sigmoid_fit_mu'] = None
+#             key['sigmoid_fit_sigma'] = None
+#             key['sigmoid_fit_exp_temperature'] = None
+#             key['sigmoid_fit_exp_bias'] = None
+#             key['linear_fit_slope'] = None
+#             key['linear_fit_c'] = None
+# =============================================================================
+            key['trial_num'] = n
+            key['local_filter'] = df_psychcurve['local_filter'][0]
+            #%
             self.insert1(key,skip_duplicates=True)
 
 @schema    
@@ -1785,7 +1974,7 @@ class SubjectPsychometricCurveBoxCarDifferential(dj.Computed):
     local_filter : longblob
     """     
     def make(self,key): 
-        #%%
+        #%
         minsession = 8
         reward_ratio_binnum = 10
         df_psychcurve = pd.DataFrame(SessionPsychometricDataBoxCar()&key & 'session > '+str(minsession-1))
@@ -1801,7 +1990,7 @@ class SubjectPsychometricCurveBoxCarDifferential(dj.Computed):
             slope = out[0][0]
             c = out[0][1]
             reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n = bin_psychometric_curve(reward_ratio_combined,choice_num,reward_ratio_binnum)
-            
+            #%
             key['reward_ratio_mean'] = reward_ratio_mean
             key['reward_ratio_sd'] = reward_ratio_sd
             key['choice_ratio_mean'] = choice_ratio_mean
@@ -1813,9 +2002,139 @@ class SubjectPsychometricCurveBoxCarDifferential(dj.Computed):
             key['linear_fit_slope'] = slope
             key['linear_fit_c'] = c
             key['trial_num'] = n
-            key['local_filter'] = df_psychcurve['local_filter']
-            #%%
+            key['local_filter'] = df_psychcurve['local_filter'][0]
+            #%
             self.insert1(key,skip_duplicates=True)
+            
+@schema    
+class SubjectPolarPsyCurveBoxCarDifferential2lp(dj.Computed):
+    definition = """
+    -> lab.Subject
+    ---
+    reward_ratio_mean  : longblob
+    reward_ratio_sd  : longblob
+    choice_ratio_mean  : longblob
+    choice_ratio_sd  : longblob
+    trial_num : longblob
+    local_filter : longblob
+    """     
+# =============================================================================
+#     sigmoid_fit_mu : double
+#     sigmoid_fit_sigma : double 
+#     sigmoid_fit_exp_temperature : double
+#     sigmoid_fit_exp_bias : double 
+#     linear_fit_slope : double
+#     linear_fit_c : double
+# =============================================================================    
+    def make(self,key):  
+        #%
+        #key = {'subject_id': 452273}
+        minsession = 8
+        reward_ratio_binnum = 10
+        
+        df_psychcurve = pd.DataFrame(SessionPsychometricDataBoxCar()*SessionTrainingType()&key & 'session > '+str(minsession-1)&'session_task_protocol = 100')
+        if len(df_psychcurve )>0:
+            print(key)
+            #%
+            vector_middle = [1,0]
+            vector_right = [-1*np.cos(np.pi/3),np.sin(np.pi/3)]
+            vector_left = [-1*np.cos(np.pi/3),-1*np.sin(np.pi/3)]
+            reward_ratio_combined_right = np.concatenate(df_psychcurve['local_differential_income_right'].values)
+            reward_ratio_combined_left = np.concatenate(df_psychcurve['local_differential_income_left'].values)
+            reward_ratio_combined_middle = np.concatenate(df_psychcurve['local_differential_income_middle'].values)
+            reward_ratio_x_coords = reward_ratio_combined_right*vector_right[0] + reward_ratio_combined_middle*vector_middle[0] +reward_ratio_combined_left*vector_left[0]
+            reward_ratio_y_coords = reward_ratio_combined_right*vector_right[1] + reward_ratio_combined_middle*vector_middle[1] +reward_ratio_combined_left*vector_left[1]
+            reward_ratio_arc = np.arctan2(reward_ratio_y_coords,reward_ratio_x_coords)
+            arc_left_right_middle = np.asarray(np.arctan2([vector_left[1],vector_right[1],vector_middle[1]],[vector_left[0],vector_right[0],vector_middle[0]]))
+            choice_num = np.asarray(np.concatenate(df_psychcurve['choice_local_differential_income'].values),int)
+            choice_arc = arc_left_right_middle[choice_num]
+
+            
+            reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n = bin_psychometric_curve(reward_ratio_arc,choice_arc,reward_ratio_binnum,circular = True)
+            #%
+            key['reward_ratio_mean'] = reward_ratio_mean
+            key['reward_ratio_sd'] = reward_ratio_sd
+            key['choice_ratio_mean'] = choice_ratio_mean
+            key['choice_ratio_sd'] = choice_ratio_sd
+# =============================================================================
+#             key['sigmoid_fit_mu'] = None
+#             key['sigmoid_fit_sigma'] = None
+#             key['sigmoid_fit_exp_temperature'] = None
+#             key['sigmoid_fit_exp_bias'] = None
+#             key['linear_fit_slope'] = None
+#             key['linear_fit_c'] = None
+# =============================================================================
+            key['trial_num'] = n
+            key['local_filter'] = df_psychcurve['local_filter'][0]
+            #%
+            self.insert1(key,skip_duplicates=True) 
+
+           
+@schema    
+class SubjectPolarPsyCurveBoxCarDifferential3lp(dj.Computed):
+    definition = """
+    -> lab.Subject
+    ---
+    reward_ratio_mean  : longblob
+    reward_ratio_sd  : longblob
+    choice_ratio_mean  : longblob
+    choice_ratio_sd  : longblob
+    trial_num : longblob
+    local_filter : longblob
+    """     
+# =============================================================================
+#     sigmoid_fit_mu : double
+#     sigmoid_fit_sigma : double 
+#     sigmoid_fit_exp_temperature : double
+#     sigmoid_fit_exp_bias : double 
+#     linear_fit_slope : double
+#     linear_fit_c : double
+# =============================================================================    
+    def make(self,key):  
+        #%
+        #key = {'subject_id': 452273}
+        minsession = 8
+        reward_ratio_binnum = 10
+        
+        df_psychcurve = pd.DataFrame(SessionPsychometricDataBoxCar()*SessionTrainingType()&key & 'session > '+str(minsession-1)&'session_task_protocol = 101')
+        if len(df_psychcurve )>0:
+            print(key)
+            #%
+            vector_middle = [1,0]
+            vector_right = [-1*np.cos(np.pi/3),np.sin(np.pi/3)]
+            vector_left = [-1*np.cos(np.pi/3),-1*np.sin(np.pi/3)]
+            reward_ratio_combined_right = np.concatenate(df_psychcurve['local_differential_income_right'].values)
+            reward_ratio_combined_left = np.concatenate(df_psychcurve['local_differential_income_left'].values)
+            reward_ratio_combined_middle = np.concatenate(df_psychcurve['local_differential_income_middle'].values)
+            reward_ratio_x_coords = reward_ratio_combined_right*vector_right[0] + reward_ratio_combined_middle*vector_middle[0] +reward_ratio_combined_left*vector_left[0]
+            reward_ratio_y_coords = reward_ratio_combined_right*vector_right[1] + reward_ratio_combined_middle*vector_middle[1] +reward_ratio_combined_left*vector_left[1]
+            reward_ratio_arc = np.arctan2(reward_ratio_y_coords,reward_ratio_x_coords)
+            arc_left_right_middle = np.asarray(np.arctan2([vector_left[1],vector_right[1],vector_middle[1]],[vector_left[0],vector_right[0],vector_middle[0]]))
+            choice_num = np.asarray(np.concatenate(df_psychcurve['choice_local_differential_income'].values),int)
+            choice_arc = arc_left_right_middle[choice_num]
+
+            
+            reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n = bin_psychometric_curve(reward_ratio_arc,choice_arc,reward_ratio_binnum,circular = True)
+            #%
+            key['reward_ratio_mean'] = reward_ratio_mean
+            key['reward_ratio_sd'] = reward_ratio_sd
+            key['choice_ratio_mean'] = choice_ratio_mean
+            key['choice_ratio_sd'] = choice_ratio_sd
+# =============================================================================
+#             key['sigmoid_fit_mu'] = None
+#             key['sigmoid_fit_sigma'] = None
+#             key['sigmoid_fit_exp_temperature'] = None
+#             key['sigmoid_fit_exp_bias'] = None
+#             key['linear_fit_slope'] = None
+#             key['linear_fit_c'] = None
+# =============================================================================
+            key['trial_num'] = n
+            key['local_filter'] = df_psychcurve['local_filter'][0]
+            #%
+            self.insert1(key,skip_duplicates=True)
+
+            
+            
 
 @schema    
 class SubjectPsychometricCurveFittedFractional(dj.Computed):
@@ -1840,7 +2159,7 @@ class SubjectPsychometricCurveFittedFractional(dj.Computed):
         reward_ratio_binnum = 10
         df_psychcurve = pd.DataFrame(SessionPsychometricDataFitted()&key & 'session > '+str(minsession-1))
         if len(df_psychcurve )>0:
-            #%%
+            #%
             reward_ratio_combined = np.concatenate(df_psychcurve['local_fractional_income_right'].values)
             choice_num = np.concatenate(df_psychcurve['choice_local_fractional_income'].values)
             mu,sigma = curve_fit(norm.cdf, reward_ratio_combined, choice_num,p0=[0,1])[0]
@@ -1863,7 +2182,7 @@ class SubjectPsychometricCurveFittedFractional(dj.Computed):
             key['linear_fit_slope'] = slope
             key['linear_fit_c'] = c
             key['trial_num'] = n
-            key['local_filter'] = df_psychcurve['local_filter']
+            key['local_filter'] = df_psychcurve['local_filter'][0]
             self.insert1(key,skip_duplicates=True)
     
 @schema    
@@ -1889,7 +2208,7 @@ class SubjectPsychometricCurveFittedDifferential(dj.Computed):
         reward_ratio_binnum = 10
         df_psychcurve = pd.DataFrame(SessionPsychometricDataFitted()&key & 'session > '+str(minsession-1))
         if len(df_psychcurve )>0:
-            #%%
+            #%
             reward_ratio_combined = np.concatenate(df_psychcurve['local_differential_income_right'].values)
             choice_num = np.concatenate(df_psychcurve['choice_local_differential_income'].values)   
             
@@ -1919,11 +2238,11 @@ class SubjectPsychometricCurveFittedDifferential(dj.Computed):
             key['linear_fit_slope'] = slope
             key['linear_fit_c'] = c
             key['trial_num'] = n
-            key['local_filter'] = df_psychcurve['local_filter']
+            key['local_filter'] = df_psychcurve['local_filter'][0]
             self.insert1(key,skip_duplicates=True)    
             
 @schema    
-class SessionPerformance(dj.Computed):     
+class SessionPerformance(dj.Computed):     # works only for left-right ... needs to be upgraded
     definition = """
     -> experiment.Session
     ---
@@ -1933,14 +2252,14 @@ class SessionPerformance(dj.Computed):
     performance_fitted_differential  : double
     """       
     def make(self,key):  
-        #%%
+        #%
 # =============================================================================
 #         #key = {'subject_id':453475,'session':21}
 # =============================================================================
         df_choices = pd.DataFrame(SessionPsychometricDataBoxCar()&key)
-        #%%
+        #%
         if len(df_choices)>10:
-            #%%
+            #%
             df_psycurve_fractional = pd.DataFrame(SubjectPsychometricCurveBoxCarFractional()&key)
             df_psycurve_differential = pd.DataFrame(SubjectPsychometricCurveBoxCarDifferential()&key)
             #%

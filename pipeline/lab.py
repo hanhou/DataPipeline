@@ -1,4 +1,4 @@
- import datajoint as dj
+import datajoint as dj
 from pipeline.pipeline_tools import get_schema_name
 
 schema = dj.schema(get_schema_name('lab'),locals())
