@@ -1,4 +1,4 @@
-
+#%%
 import datajoint as dj
 import pandas as pd
 import numpy as np
@@ -1850,7 +1850,7 @@ class SubjectPsychometricCurveFittedFractional(dj.Computed):
             out = curve_fit(lambda t,a,b: a*t+b,  reward_ratio_combined,  choice_num)
             slope = out[0][0]
             c = out[0][1]
-            reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n = bin_psychometric_curve(reward_ratio_combined,choice_num,reward_ratio_binnum)
+            reward_ratio_mean, reward_ratio_sd, choice_ratio_mean, choice_ratio_sd, n = F(reward_ratio_combined,choice_num,reward_ratio_binnum)
             
             key['reward_ratio_mean'] = reward_ratio_mean
             key['reward_ratio_sd'] = reward_ratio_sd

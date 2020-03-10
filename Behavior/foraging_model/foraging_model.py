@@ -45,7 +45,8 @@ def run_task(p_reward_L,p_reward_R,n_trials,unchosen_rewards_to_keep = 1,subject
     history_choice = np.array([],dtype=int)#1 is right, 0 is left
     history_reward = np.full(0,True,dtype=bool)
     history_rewardrate_constant=np.array([])#1 is right, 0 is left
-    history_rewardrate_dynamic=np.array([])#1 is right, 0 is left
+    history_rewardrate_dynamic=np.array([])#1 is right, 0 is 
+    
     for n_trials_now, p_reward_R_now, p_reward_L_now in zip(n_trials,p_reward_R,p_reward_L):
         for i_trial in range(n_trials_now):
             # assigning reward to lickports
@@ -53,6 +54,7 @@ def run_task(p_reward_L,p_reward_R,n_trials,unchosen_rewards_to_keep = 1,subject
             reward_R = np.random.uniform(0,1) < p_reward_R_now
             rewardrate_constant=(p_reward_R_now)/(p_reward_R_now+p_reward_L_now)#/2+.5; # current flat reward rate
             history_rewardrate_constant=np.append(history_rewardrate_constant,rewardrate_constant)
+            
             if sum(history_reward == True) < min_rewardnum:
                 choice=np.random.choice(['left','right']) # this will be given by the model
                 history_rewardrate_dynamic=np.append(history_rewardrate_dynamic,[np.NaN])
@@ -69,6 +71,7 @@ def run_task(p_reward_L,p_reward_R,n_trials,unchosen_rewards_to_keep = 1,subject
                 
                 rewardrate_left=np.sum(history_reward_local[history_choice_local==0][-min_rewardnum:])
                 rewardrate_right=np.sum(history_reward_local[history_choice_local==1][-min_rewardnum:])
+                
                 #print(rewardrate_right+rewardrate_left)
                 if rewardrate_right+rewardrate_left == 0:
                     rewardrate_dynamic = .5
@@ -148,6 +151,8 @@ def run_task(p_reward_L,p_reward_R,n_trials,unchosen_rewards_to_keep = 1,subject
                 if accumulated_rewards_R < unchosen_rewards_to_keep and reward_R:
                     accumulated_rewards_R += 1
             history_reward=np.append(history_reward,[reward])
+            
+            
     plt.plot(y.T)
     if plot:
         history_choicenum = np.arange(0,len(history_choice))

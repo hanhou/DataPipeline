@@ -1,4 +1,4 @@
-
+#%%
 from datetime import datetime, timedelta, time
 import pandas as pd
 import numpy as np
@@ -32,7 +32,7 @@ def draw_bs_pairs_linreg(x, y, size=1):
 
     return bs_slope_reps, bs_intercept_reps
 
-
+    
 def merge_dataframes_with_nans(df_1,df_2,basiscol):
     basiscol = 'trial'
     colstoadd = list()
@@ -588,7 +588,9 @@ def plot_local_psychometric_curve(wr_name = 'FOR08',session = 4, model = 'fitted
     ax4.set_ylabel('Relative value')
     ax4.set_title('Filter for local reward rate')
  #%%   
+    
 def plot_one_session(wr_name = 'FOR02',session = 23, model = 'fitted differential', choice_filter = np.ones(10), local_filter = np.ones(10), RT_filter = np.ones(10), fit = 'not_specified'):
+    
     warnings.filterwarnings("ignore", category=RuntimeWarning)
     plt.rcParams.update({'font.size': 18})
 #%%
@@ -850,9 +852,12 @@ def plot_one_session(wr_name = 'FOR02',session = 23, model = 'fitted differentia
 #     ax4=fig.add_axes([0,-3,1,.8])                   
 #     ax4.plot(rewardratio_R / rewardratio_sum,bias,'ko')        
 # =============================================================================
+    
+    print('Calling plot_local_psychometric_curve...')
+    
     if plottype == '2lickport':
         plot_local_psychometric_curve(wr_name = wr_name ,session = session, model=model)
-        
+       
     
 #ax1.set_xlim(00, 600)
 #ax2.set_xlim(00, 600)
